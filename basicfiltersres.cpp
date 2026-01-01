@@ -22,13 +22,13 @@ const double pi = 3.14159265358979323846264338327950288419716939937510;
 const double transformFromRadToDeg = 180.0 / pi;
 
 string getFileName();
-vector <Pixel> blur(ifstream &f);
-void makeFile(vector <Pixel> &pic);
-vector <Pixel> loadPic(ifstream &f);
 int intVer(int mini, int maxi, string message);
+void makeFile(vector <Pixel> &pic);
+vector <double> makeGaussMask(int ans);
+vector <Pixel> blur(ifstream &f);
+vector <Pixel> loadPic(ifstream &f);
 vector <Pixel> gaussBlur(ifstream &f);
 vector <Pixel> sobelOperator(ifstream &f);
-vector <double> makeGaussMask(int ans);
 vector <Pixel> canny(ifstream &f);
 
 
