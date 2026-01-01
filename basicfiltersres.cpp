@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -11,15 +12,14 @@
 
 using namespace std;
 
-
 struct Pixel {
-    uint8_t r, g, b;
+    double r, g, b;
+    int angle;
 };
 
 int WIDTH, HEIGHT;
-bool bu;
-
-
+const double pi = 3.14159265358979323846264338327950288419716939937510;
+const double transformFromRadToDeg = 180.0 / pi;
 
 string getFileName();
 vector <Pixel> blur(ifstream &f);
@@ -28,7 +28,8 @@ vector <Pixel> loadPic(ifstream &f);
 int intVer(int mini, int maxi, string message);
 vector <Pixel> gaussBlur(ifstream &f);
 vector <Pixel> sobelOperator(ifstream &f);
-vector <int> makeGaussMask(int ans);
+vector <double> makeGaussMask(int ans);
+vector <Pixel> canny(ifstream &f);
 
 
 
@@ -50,9 +51,10 @@ int main()
         cout << "not a bmp file\n";
         return 1;
     }
-    vector <Pixel> pic;
-    int choice = intVer(1, 3, "What do you want to do to the image?: \n1.Normal Blur\n2.Gaussian Blur\n3.Edge Detection\n");
 
+    vector <Pixel> pic;
+
+    int choice = intVer(1, 4, "What do you want to do to the image?: \n1.Normal Blur\n2.Gaussian Blur\n3.Sobel Edge Detection\n4.Canny Edge Detection\n");
     switch (choice)
     {
         case 1:
@@ -63,6 +65,9 @@ int main()
             break;
         case 3:
             pic = sobelOperator(f);
+            break;
+        case 4:
+            pic = canny(f);
             break;
     }
     makeFile(pic);
@@ -82,7 +87,7 @@ string getFileName()
         {
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            cout << "invalid file name please try again";
+            cout << "invalid file name please try again\n";
         }
     }
 }
@@ -114,7 +119,7 @@ vector <Pixel> blur(ifstream &f)
 {
     vector <Pixel> pic = loadPic(f);
     vector <Pixel> newpic (HEIGHT * WIDTH);
-    int mag = intVer(1, 10, "Choose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n4.9X9\n5.11X11\n6.13X13\n7.15X15\n8.17X17\n9.19X19\n10.21X21\n");
+    int mag = intVer(1, 10, "\n***************\nChoose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n4.9X9\n5.11X11\n6.13X13\n7.15X15\n8.17X17\n9.19X19\n10.21X21\n");
     for (int i = 0; i < WIDTH; i++)
     {
         for (int j = 0; j < HEIGHT; j++)
@@ -154,7 +159,7 @@ vector <Pixel> blur(ifstream &f)
 
 void makeFile(vector <Pixel> &pic)
 {
-    cout << "Making the file...\n";
+    cout << "\n***************\nMaking the file...\n";
     int realh = abs(HEIGHT);
     int rowSize = WIDTH * 3;
     int padding = (4 - rowSize % 4) % 4;
@@ -184,30 +189,30 @@ void makeFile(vector <Pixel> &pic)
     uint8_t pad[3] = {0,0,0};
     for (int i = 0; i < HEIGHT; i++)
     {
-        int y = bu ? i : (HEIGHT - 1 - i);
         for (int x = 0; x < WIDTH; x++)
         {
-            f.put(pic[y * WIDTH + x].b);
-            f.put(pic[y * WIDTH + x].g);
-            f.put(pic[y * WIDTH + x].r);
+            f.put((uint8_t) pic[i * WIDTH + x].b);
+            f.put((uint8_t) pic[i * WIDTH + x].g);
+            f.put((uint8_t) pic[i * WIDTH + x].r);
         }
         f.write((char*)pad, padding);
     }
     f.close();
+    cout << "Done making the file!\n";
     return;
 }
 
 
 vector <Pixel> loadPic(ifstream &f)
 {
-    cout << "Loading the image...\n";
+    cout << "\n***************\nLoading the image...\n";
     int temph;
     
     f.seekg(18, fstream::beg);
     f.read((char*)&WIDTH, 4);
     f.read((char*)&temph, 4);
     HEIGHT = abs(temph);
-    bu = (temph > 0);
+    bool bu = (temph > 0);
     f.seekg(10, fstream::beg);   
     uint32_t offset;
     f.read((char*)& offset, 4);
@@ -217,6 +222,7 @@ vector <Pixel> loadPic(ifstream &f)
     int padding = (4 - ((WIDTH * 3) % 4)) % 4;
     for (int i = 0; i < HEIGHT; i++)
     {
+        int y = (bu) ? i : HEIGHT - 1 - i;
         for (int j = 0; j < WIDTH; j++)
         {
             Pixel pixel;
@@ -224,11 +230,11 @@ vector <Pixel> loadPic(ifstream &f)
             pixel.b = f.get();
             pixel.g = f.get();
             pixel.r = f.get();
-            pic[i * WIDTH + j] = pixel;
+            pic[y * WIDTH + j] = pixel;
         }
         f.ignore(padding);
     }
-    cout << "file was loaded successfully\n";
+    cout << "File was loaded successfully\n";
     f.close();
     return pic;
 }
@@ -239,29 +245,29 @@ vector <Pixel> gaussBlur(ifstream &f)
     vector <Pixel> pic = loadPic(f);
     vector <Pixel> newpic (HEIGHT * WIDTH);
 
-    vector <int> G3 = {
-    1, 2, 1,
-    2, 4, 2,
-    1, 2, 1};
-    vector <int> G5 = {
-    1,  4,  7,  4,  1,
-    4, 16, 26, 16,  4,
-    7, 26, 41, 26,  7,
-    4, 16, 26, 16,  4,
-    1,  4,  7,  4,  1};
-    vector <int> G7 = {
-    0,  0,  1,  2,  1,  0,  0,
-    0,  3, 13, 22, 13,  3,  0,
-    1, 13, 59, 97, 59, 13,  1,
-    2, 22, 97,159, 97, 22,  2,
-    1, 13, 59, 97, 59, 13,  1,
-    0,  3, 13, 22, 13,  3,  0,
-    0,  0,  1,  2,  1,  0,  0};
+    vector <double> G3 = {
+    1.0, 2.0, 1.0,
+    2.0, 4.0, 2.0,
+    1.0, 2.0, 1.0};
+    vector <double> G5 = {
+    1.0,  4.0,  7.0,  4.0,  1.0,
+    4.0, 16.0, 26.0, 16.0,  4.0,
+    7.0, 26.0, 41.0, 26.0,  7.0,
+    4.0, 16.0, 26.0, 16.0,  4.0,
+    1.0,  4.0,  7.0,  4.0,  1.0};
+    vector <double> G7 = {
+    0.0,  0.0,  1.0,  2.0,  1.0,  0.0,  0.0,
+    0.0,  3.0, 13.0, 22.0, 13.0,  3.0,  0.0,
+    1.0, 13.0, 59.0, 97.0, 59.0, 13.0,  1.0,
+    2.0, 22.0, 97.0,159.0, 97.0, 22.0,  2.0,
+    1.0, 13.0, 59.0, 97.0, 59.0, 13.0,  1.0,
+    0.0,  3.0, 13.0, 22.0, 13.0,  3.0,  0.0,
+    0.0,  0.0,  1.0,  2.0,  1.0,  0.0,  0.0};
 
-    int ans = intVer(1, 3, "Choose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n");
+    int ans = intVer(1, 3, "\n***************\nChoose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n");
     
-    vector <int> G;
-    int approx = intVer(1, 2, "Do you want to:\n1.Use a premade mask\n2.Approximate a mask by giving a value for sigma\n");
+    vector <double> G;
+    int approx = intVer(1, 2, "\n***************\nDo you want to:\n1.Use a premade mask\n2.Approximate a mask by giving a value for sigma\n");
     if (approx == 1)
     {
         switch (ans)
@@ -279,24 +285,23 @@ vector <Pixel> gaussBlur(ifstream &f)
     }
     else 
         G = makeGaussMask(ans);
-    cout << "Making the filter...\n";
+    cout << "\n***************\nMaking the Gaussian filter...\n";
     for (int i = 0; i < HEIGHT; i++)
     {
-        int yi = (bu) ? i : HEIGHT - 1 - i;
         for (int j = 0; j < WIDTH; j++)
         {
             Pixel p;
-            int r, g, b, nc;
-            r = g = b = nc = 0;
+            double r, g, b, nc;
+            r = g = b = nc = 0.0;
             for (int ti = -ans; ti <= ans; ti++)
             {
                 for (int tj = -ans; tj <= ans; tj++)
                 {
-                    int y = ti + yi;
+                    int y = ti + i;
                     int x = tj + j;
                     if (y < HEIGHT && y >= 0 && x < WIDTH && x >= 0)
                     {
-                        int tr = G[(ti + ans) * (ans * 2 + 1) + (tj + ans)];
+                        double tr = G[(ti + ans) * (ans * 2 + 1) + (tj + ans)];
                         int index = y * WIDTH + x;
 
                         r += pic[index].r * tr;
@@ -309,21 +314,20 @@ vector <Pixel> gaussBlur(ifstream &f)
             p.r = r/nc;
             p.g = g/nc;
             p.b = b/nc;
-            newpic[yi * WIDTH + j] = p;
+            newpic[i * WIDTH + j] = p;
         }
     }
-    cout << "Done the filter!\n";
+    cout << "\n***************\nDone the Gaussian filter!\n";
     return newpic;
 }
 
 
-vector <int> makeGaussMask(int ans)
+vector <double> makeGaussMask(int ans)
 {
     int k = 2 * ans + 1;
     vector <double> tempmask (k * k);
-    double pi = 3.14159265358979323846264338327950288419716939937510;
     double sigma;
-    cout << "Give a value to sigma: ";
+    cout << "\n***************\nGive a value to sigma: ";
     cin >> sigma;
     sigma *= sigma;
     double coeff = 1/(2 * sigma * pi);
@@ -337,7 +341,7 @@ vector <int> makeGaussMask(int ans)
         }
     }
     double divBy = 1.0/min_element(tempmask.begin(), tempmask.end())[0];
-    vector <int> mask (k * k);
+    vector <double> mask (k * k);
     
     for (int i = 0; i < k * k; i++)
         mask[i] = round(divBy * tempmask[i]);
@@ -347,7 +351,7 @@ vector <int> makeGaussMask(int ans)
 
 vector <Pixel> sobelOperator(ifstream &f)
 {
-    int useGaussOrNot = intVer(1, 2, "Do you want to use the Gaussian Blur before applying the edge detector?:\n1.Yes\n2.No\n") - 1;
+    int useGaussOrNot = intVer(1, 2, "\n***************\nDo you want to use the Gaussian Blur before applying the edge detector?:\n1.Yes\n2.No\n") - 1;
     vector <Pixel> pic;
     if (!useGaussOrNot)
         pic = gaussBlur(f);
@@ -355,55 +359,162 @@ vector <Pixel> sobelOperator(ifstream &f)
         pic = loadPic(f);
     vector <Pixel> newpic (HEIGHT * WIDTH);
 
-    cout << "Making the filter...\n";
+    cout << "\n***************\nMaking the Sobel filter...\n";
 
-    static const int vertical[3][3] = {
-        {-1, 0, 1},
-        {-2, 0, 2},
-        {-1, 0, 1}
+    static const double vertical[3][3] = {
+        {-1.0, 0.0, 1.0},
+        {-2.0, 0.0, 2.0},
+        {-1.0, 0.0, 1.0}
     };
-    static const int horizontal[3][3] = {
-        {-1, -2, -1},
-        {0, 0, 0},
-        {1, 2, 1}
+    static const double horizontal[3][3] = {
+        {-1.0, -2.0, -1.0},
+        {0.0, 0.0, 0.0},
+        {1.0, 2.0, 1.0}
     };
 
     for (int i = 0; i < HEIGHT; i++)
     {
-        int yi = (bu) ? i : HEIGHT - 1 - i;
         for (int j = 0; j < WIDTH; j++)
         {
             Pixel p;
-            int avgV = 0;
-            int avgH = 0;
+            double Gx = 0;
+            double Gy = 0;
             for (int ti : {-1, 0, 1})
             {
                 for (int tj : {-1, 0, 1})
                 {
-                    int y = ti + yi;
+                    int y = ti + i;
                     int x = tj + j;
                     if (y < HEIGHT && y >= 0 && x < WIDTH && x >= 0)
                     {
-                        int trV = vertical[ti + 1][tj + 1];
-                        int trH = horizontal[ti + 1][tj + 1];
+                        double trV = vertical[ti + 1][tj + 1];
+                        double trH = horizontal[ti + 1][tj + 1];
                         int index = y * WIDTH + x;
-                        int gray = (pic[index].r + pic[index].g + pic[index].b) / 3;
-                        avgV += trV * gray;
-                        avgH += trH * gray;
+                        double gray = (pic[index].r + pic[index].g + pic[index].b) / 3;
+                        Gx += trV * gray;
+                        Gy += trH * gray;
                     }
                 }
             }
-            if (abs(avgV) > 255)
-                avgV = 255;
-            if (abs(avgH) > 255)
-                avgH = 255;
-            int val = sqrt(avgV * avgV + avgH * avgH);
+            double val = sqrt(Gx * Gx + Gy * Gy);
             if (val > 255)
                 val = 255;
-            int index = yi * WIDTH + j;
+            int index = i * WIDTH + j;
             newpic[index].r = newpic[index].g = newpic[index].b = val;
+            double angle = atan2(Gy, Gx) * transformFromRadToDeg;
+            if (angle < 0)
+                angle += 180.0;
+
+            /*
+            there's some shish kebab going on here idk what it is but something is not right 
+            Eyad
+            */
+           
+            newpic[index].angle = angle;
         }
     }
-    cout << "Done the filter!\n";
+    cout << "Done the Sobel filter!\n";
+    return newpic;
+}
+
+vector <Pixel> canny(ifstream &f)
+{
+    vector <Pixel> pic = sobelOperator(f);
+    vector <Pixel> newpic (HEIGHT * WIDTH);
+
+    int The_High_ThreshHold = intVer(1, 255, "\n***************\nThresh hold 1 (High): ");
+    int The_Low_ThreshHold = intVer(0, The_High_ThreshHold, "Thresh hold 2 (Low): ");
+
+    cout << "\n***************\nMaking the canny operator...\n";
+    for (int i = 0; i < HEIGHT; i++)
+    {
+        for (int j = 0; j < WIDTH; j++)
+        {
+            int idx = i * WIDTH + j;
+            int dir;
+            double angle = pic[idx].angle;
+            if ((angle >= 0) && (angle < 22.5) || (angle >= 157.5 && angle <= 180))
+                dir = 0;
+            else if (angle >= 22.5 && angle < 67.5)
+                dir = 45;
+            else if (angle >= 67.5 && angle < 112.5)
+                dir = 90;
+            else
+                dir = 135;
+            double pix1 = 0.0, pix2 = 0.0;
+            switch (dir)
+            {
+            case 0:
+                if (j - 1 >= 0)
+                    pix1 = pic[i * WIDTH + j - 1].r;
+                if (j + 1 < WIDTH)
+                    pix2 = pic[i * WIDTH + j + 1].r;                
+                break;
+            case 45:
+                if (j + 1 < WIDTH && i + 1 < HEIGHT)
+                    pix1 = pic[(i + 1) * WIDTH + j + 1].r;
+                if (j - 1 >= 0 && i - 1 >= 0)
+                    pix2 = pic[(i - 1) * WIDTH + j - 1].r;
+                break;
+            case 90:
+                if (i - 1 >= 0)
+                    pix1 = pic[(i - 1) * WIDTH + j].r;
+                if (i + 1 < HEIGHT)
+                    pix2 = pic[(i + 1) * WIDTH + j].r;
+                break;
+            case 135:
+                if (j - 1 >= 0 && i + 1 < HEIGHT)
+                    pix1 = pic[(i + 1) * WIDTH + j - 1].r;
+                if (j + 1 < WIDTH && i - 1 >= 0)
+                    pix2 = pic[(i - 1) * WIDTH + j + 1].r;
+                break;
+            }
+            if (pic[idx].r >= pix1 && pic[idx].r >= pix2)
+                newpic[idx].r = newpic[idx].g = newpic[idx].b = pic[idx].r;
+            else
+                newpic[idx].r = newpic[idx].g = newpic[idx].b = 0;
+        }
+    }
+    bool changes;
+    do {
+        changes = false;
+        for (int i = 0; i < HEIGHT; i++)
+        {
+            for (int j = 0; j < WIDTH; j++)
+            {
+                int idx = i * WIDTH + j;
+                
+                if (newpic[idx].r >= The_High_ThreshHold)
+                    continue;
+                else if (newpic[idx].r < The_Low_ThreshHold)
+                {
+                    newpic[idx].r = newpic[idx].g = newpic[idx].b = 0;
+                    continue;
+                }
+                for (int ni : {-1, 0, 1})
+                {
+                    bool connected = false;
+                    for (int nj : {-1, 0, 1})
+                    {
+                        if (ni == 0 && nj == 0) continue;
+                        int x = j + nj;
+                        int y = i + ni;
+                        if (y >= 0 && y < HEIGHT && x >= 0 && x < WIDTH)
+                        {
+                            if (newpic[y * WIDTH + x].r >= The_High_ThreshHold)
+                            {
+                                newpic[idx].r = newpic[idx].g = newpic[idx].b = The_High_ThreshHold;
+                                connected = true;
+                                changes = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (connected) break;
+                }
+            }
+        }
+    } while (changes);
+    cout << "Done making the canny Operator!";
     return newpic;
 }
