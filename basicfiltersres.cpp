@@ -9,7 +9,6 @@
 #include <ranges>
 #include <cmath>
 
-
 using namespace std;
 
 struct Pixel {
@@ -23,14 +22,13 @@ const double transformFromRadToDeg = 180.0 / pi;
 
 string getFileName();
 int intVer(int mini, int maxi, string message);
+float floatVer(float maxi, float mini, string message);
 void makeFile(vector <Pixel> &pic);
 vector <double> makeGaussMask(int ans);
-vector <Pixel> blur(ifstream &f);
 vector <Pixel> loadPic(ifstream &f);
 vector <Pixel> gaussBlur(ifstream &f);
 vector <Pixel> sobelOperator(ifstream &f);
 vector <Pixel> canny(ifstream &f);
-
 
 
 
@@ -54,19 +52,16 @@ int main()
 
     vector <Pixel> pic;
 
-    int choice = intVer(1, 4, "What do you want to do to the image?: \n1.Normal Blur\n2.Gaussian Blur\n3.Sobel Edge Detection\n4.Canny Edge Detection\n");
+    int choice = intVer(1, 3, "What do you want to do to the image?:\n1.Blur\n2.Sobel Edge Detection\n3.Canny Edge Detection\n");
     switch (choice)
     {
         case 1:
-            pic = blur(f);
-            break;
-        case 2:
             pic = gaussBlur(f);
             break;
-        case 3:
+        case 2:
             pic = sobelOperator(f);
             break;
-        case 4:
+        case 3:
             pic = canny(f);
             break;
     }
@@ -112,48 +107,6 @@ int intVer(int mini, int maxi, string message)
             cout << "Invalid Please try again\n";
         }
     }
-}
-
-
-vector <Pixel> blur(ifstream &f)
-{
-    vector <Pixel> pic = loadPic(f);
-    vector <Pixel> newpic (HEIGHT * WIDTH);
-    int mag = intVer(1, 10, "\n***************\nChoose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n4.9X9\n5.11X11\n6.13X13\n7.15X15\n8.17X17\n9.19X19\n10.21X21\n");
-    for (int i = 0; i < WIDTH; i++)
-    {
-        for (int j = 0; j < HEIGHT; j++)
-        {
-            Pixel midPix = {};
-            int rsum, gsum, bsum, nc;
-            rsum = gsum = bsum = nc = 0;
-            for (int ti = -mag; ti <= mag; ti++)
-            {
-                for (int tj = -mag; tj <= mag; tj++)
-                {
-                    int x = i + ti;
-                    int y = j + tj;
-                    if (x < WIDTH && x >= 0 && y < HEIGHT && y >= 0)
-                    {
-                        rsum += pic[y * WIDTH + x].r;
-                        gsum += pic[y * WIDTH + x].g;
-                        bsum += pic[y * WIDTH + x].b;
-                        nc++;
-                    }
-                }
-            }
-            midPix.r = rsum/nc;
-            midPix.g = gsum/nc;
-            midPix.b = bsum/nc;
-            newpic[j * WIDTH + i] = midPix;
-        }
-    }    
-    return newpic;
-    
-    /*  from here you should try to implement the filters, 
-        and if you have connection i'd advise reading more about cin safety 
-        Eyad/
-    */
 }
 
 
@@ -263,29 +216,40 @@ vector <Pixel> gaussBlur(ifstream &f)
     1.0, 13.0, 59.0, 97.0, 59.0, 13.0,  1.0,
     0.0,  3.0, 13.0, 22.0, 13.0,  3.0,  0.0,
     0.0,  0.0,  1.0,  2.0,  1.0,  0.0,  0.0};
-
-    int ans = intVer(1, 3, "\n***************\nChoose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n");
-    
+    int ans;
     vector <double> G;
-    int approx = intVer(1, 2, "\n***************\nDo you want to:\n1.Use a premade mask\n2.Approximate a mask by giving a value for sigma\n");
-    if (approx == 1)
+    int blurType = intVer(1, 2, "\n***************\nDo you want to use:\n1.Basic Blur\n2.Gaussian Blur\n");
+    if (blurType == 1)
     {
-        switch (ans)
-        {
-            case 1:
-                G = G3;
-                break;
-            case 2:
-                G = G5;
-                break;
-            case 3:
-                G = G7;
-                break;
-        }
+        ans = intVer(1, 10, "\n***************\nChoose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n4.9X9\n5.11X11\n6.13X13\n7.15X15\n8.17X17\n9.19X19\n10.21X21\n");
+        for (int i = 0, n = (ans * 2 + 1) * (ans * 2 + 1); i < n; i++)
+            G.push_back(1.0);
     }
-    else 
-        G = makeGaussMask(ans);
-    cout << "\n***************\nMaking the Gaussian filter...\n";
+    else
+    {
+        ans        = intVer(1, 3, "\n***************\nChoose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n");
+        int approx = intVer(1, 2, "\n***************\nDo you want to:\n1.Use a premade mask\n2.Approximate a mask by giving a value for sigma\n");
+        
+        if (approx == 1)
+        {
+            switch (ans)
+            {
+                case 1:
+                    G = G3;
+                    break;
+                case 2:
+                    G = G5;
+                    break;
+                case 3:
+                    G = G7;
+                    break;
+            }
+        }
+        else 
+            G = makeGaussMask(ans);
+    }
+
+    cout << "\n***************\nMaking the Blur filter...\n";
     for (int i = 0; i < HEIGHT; i++)
     {
         for (int j = 0; j < WIDTH; j++)
@@ -304,9 +268,9 @@ vector <Pixel> gaussBlur(ifstream &f)
                         double tr = G[(ti + ans) * (ans * 2 + 1) + (tj + ans)];
                         int index = y * WIDTH + x;
 
-                        r += pic[index].r * tr;
-                        g += pic[index].g * tr;
-                        b += pic[index].b * tr;
+                        r  += pic[index].r * tr;
+                        g  += pic[index].g * tr;
+                        b  += pic[index].b * tr;
                         nc += tr;
                     }
                 }
@@ -368,8 +332,8 @@ vector <Pixel> sobelOperator(ifstream &f)
     };
     static const double horizontal[3][3] = {
         {-1.0, -2.0, -1.0},
-        {0.0, 0.0, 0.0},
-        {1.0, 2.0, 1.0}
+        { 0.0,  0.0,  0.0},
+        { 1.0,  2.0,  1.0}
     };
 
     for (int i = 0; i < HEIGHT; i++)
@@ -377,8 +341,8 @@ vector <Pixel> sobelOperator(ifstream &f)
         for (int j = 0; j < WIDTH; j++)
         {
             Pixel p;
-            double Gx = 0;
-            double Gy = 0;
+            double Gx = 0.0;
+            double Gy = 0.0;
             for (int ti : {-1, 0, 1})
             {
                 for (int tj : {-1, 0, 1})
@@ -404,12 +368,6 @@ vector <Pixel> sobelOperator(ifstream &f)
             double angle = atan2(Gy, Gx) * transformFromRadToDeg;
             if (angle < 0)
                 angle += 180.0;
-
-            /*
-            there's some shish kebab going on here idk what it is but something is not right 
-            Eyad
-            */
-           
             newpic[index].angle = angle;
         }
     }
@@ -417,13 +375,38 @@ vector <Pixel> sobelOperator(ifstream &f)
     return newpic;
 }
 
+float floatVer(float mini, float maxi, string message)
+{
+    float i;
+    while (true)
+    {
+        cout << message;
+        if (cin >> i)
+        {
+            if (i < mini || i > maxi)
+                cout << "Please choose between " << mini << " and "<< maxi << " !\n";
+            else return i;
+        }
+        else
+        {
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            cout << "Invalid Please try again\n";
+        }
+    }
+}
+
+
+
+
 vector <Pixel> canny(ifstream &f)
 {
     vector <Pixel> pic = sobelOperator(f);
     vector <Pixel> newpic (HEIGHT * WIDTH);
 
-    int The_High_ThreshHold = intVer(1, 255, "\n***************\nThresh hold 1 (High): ");
-    int The_Low_ThreshHold = intVer(0, The_High_ThreshHold, "Thresh hold 2 (Low): ");
+    float The_High_ThreshHold = floatVer(0.0, 1.0,                 "\n***************\nThresh hold 1 (High): ");
+    float The_Low_ThreshHold  = floatVer(0.0, The_High_ThreshHold, "Thresh hold 2 (Low): ");
+    int Highest_Brightness = 0;
 
     cout << "\n***************\nMaking the canny operator...\n";
     for (int i = 0; i < HEIGHT; i++)
@@ -469,13 +452,18 @@ vector <Pixel> canny(ifstream &f)
                     pix2 = pic[(i - 1) * WIDTH + j + 1].r;
                 break;
             }
-            if (pic[idx].r >= pix1 && pic[idx].r >= pix2)
-                newpic[idx].r = newpic[idx].g = newpic[idx].b = pic[idx].r;
-            else
+            if (pic[idx].r > Highest_Brightness)
+                Highest_Brightness = pic[idx].r;
+            if (pic[idx].r < pix1 || pic[idx].r < pix2)
                 newpic[idx].r = newpic[idx].g = newpic[idx].b = 0;
+            else
+                newpic[idx].r = newpic[idx].g = newpic[idx].b = pic[idx].r;
         }
     }
     bool changes;
+    int High = round(The_High_ThreshHold * Highest_Brightness);
+    int Low = round(The_Low_ThreshHold * Highest_Brightness);
+    
     do {
         changes = false;
         for (int i = 0; i < HEIGHT; i++)
@@ -484,9 +472,8 @@ vector <Pixel> canny(ifstream &f)
             {
                 int idx = i * WIDTH + j;
                 
-                if (newpic[idx].r >= The_High_ThreshHold)
-                    continue;
-                else if (newpic[idx].r < The_Low_ThreshHold)
+                if (newpic[idx].r >= High) continue;
+                else if (newpic[idx].r < Low)
                 {
                     newpic[idx].r = newpic[idx].g = newpic[idx].b = 0;
                     continue;
@@ -501,9 +488,9 @@ vector <Pixel> canny(ifstream &f)
                         int y = i + ni;
                         if (y >= 0 && y < HEIGHT && x >= 0 && x < WIDTH)
                         {
-                            if (newpic[y * WIDTH + x].r >= The_High_ThreshHold)
+                            if (newpic[y * WIDTH + x].r >= High)
                             {
-                                newpic[idx].r = newpic[idx].g = newpic[idx].b = The_High_ThreshHold;
+                                newpic[idx].r = newpic[idx].g = newpic[idx].b = High;
                                 connected = true;
                                 changes = true;
                                 break;
