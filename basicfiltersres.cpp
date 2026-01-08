@@ -30,8 +30,8 @@ vector <Pixel> sobelOperator(vector <Pixel> &image, int WIDTH, int HEIGHT);
 vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT);
 vector <Pixel> runMask(vector <double> mask, vector <double> SobelMask, vector <Pixel> image, int kernelSize, int WIDTH, int HEIGHT);
 
-inline bool isInScopeOfImage (int x, int y, int WIDTH, int HEIGHT) { return (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT); } // it checks if a pixel is in the boundaries of the image
-inline void setAllPixelsTo (Pixel &p, double val) { p.r = p.g = p.b = val; } // sets all values to the same value wehter is was for grayscale or for supressing a pixel
+inline bool isInScopeOfImage (int x, int y, int WIDTH, int HEIGHT) { return (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT); } 
+inline void setAllPixelsTo (Pixel &p, double val) { p.r = p.g = p.b = val; } 
 inline void separator () { cout << "\n*********************************************\n\n"; } // used to print stars and newlines all around the code, edit it here and it'll be editied everywhere
 
 
@@ -39,38 +39,36 @@ int main()
 {
     string filename = getFileName(); // get the name of the image file which must be in bmp
 
-    ifstream f (filename, ios::binary); //file name , must be bmp
-    if (!f) // if the file doesn't exist exit
-    {
+    ifstream f (filename, ios::binary); 
+    if (!f) {
         cout << "couldn't read the file\n";
         return 1;
     }
     unsigned char signature[2];
     f.read(reinterpret_cast<char*>(signature), 2);
-    if (!f || signature[0] != 'B' || signature[1] != 'M') // the signature of bmp formatted files is BM, if we don't find it, it means that the file is not in bmp format and will be rejected
-    {
+    if (!f || signature[0] != 'B' || signature[1] != 'M') {
         cout << "not a bmp file\n";
         return 1;
     }
 
-    vector <Pixel> image = loadImage(f); // reading the image into a vector of red-green-blue double values
+    vector <Pixel> image = loadImage(f); 
 
-    separator(); // newlines and stars
+    separator();
     int choice = inpurVer <int> (1, 3, "What do you want to do to the image?:\n1.Blur\n2.Sobel Edge Detection\n3.Canny Edge Detection\n"); // asking the user for the input
     switch (choice)
     {
         case 1:
-            image = Blur(image, width, height); // do a blur; basic or gaussian
+            image = Blur(image, width, height); 
             break;
         case 2:
-            image = sobelOperator(image, width, height); // do the sobel edge detection
+            image = sobelOperator(image, width, height); 
             break;
         case 3:
             vector <Pixel> sobel = sobelOperator(image, width, height);
             image = canny(sobel, width, height); // do the canny edge detection, we did the sobel first because the output of the sobel is the input of the canny
             break;
     }
-    makeFile(image, width, height); // pass the vector that holds the pixels to this function to make the bmp file (it passes it by refernece)
+    makeFile(image, width, height); 
     return 0;
 }
 
@@ -112,7 +110,6 @@ T inpurVer(T mini, T maxi, string message) // we use this function to get safe i
 
 vector <Pixel> Blur(vector <Pixel> &image, int WIDTH, int HEIGHT) // the blur function that does the basic and gaussian blur
 {
-    // make a flat vector of length WIDTH by HEIGHT
     vector <Pixel> newImage (WIDTH * HEIGHT); 
 
     // these are some common 3X3, 5X5 and 7X7 gaussian blur masks
@@ -136,7 +133,6 @@ vector <Pixel> Blur(vector <Pixel> &image, int WIDTH, int HEIGHT) // the blur fu
     0.0,  0.0,  1.0,  2.0,  1.0,  0.0,  0.0}};
 
     int ans;
-    // the vector that holds the mask values, it is also flat for speed
     vector <double> theBlurMask; 
     separator();
     // ask the user what type of blur do they want to apply
@@ -155,22 +151,17 @@ vector <Pixel> Blur(vector <Pixel> &image, int WIDTH, int HEIGHT) // the blur fu
         // Gaussian Blur
         separator();
 
-        // the dimentions of the Gaussian Blur
         ans = inpurVer <int> (1, 3, "Choose the size of the mask:\n1.3X3\n2.5X5\n3.7X7\n"); 
         separator();
 
-        // asking the user if they want to use a Gaussian mask of given properties (aka; sigma), or they would like to use the common masks
         if (inpurVer <int> (1, 2, "Do you want to:\n1.Use a premade mask\n2.Approximate a mask by giving a value for sigma\n") == 1) {
-            // yes, use the premade masks
             theBlurMask = gaussianMasks[ans - 1]; }
         else { 
-            // no, make a new mask with a given value of sigma
             theBlurMask = makeGaussMask(ans); }
     }
 
     separator();
     cout << "Making the Blur filter...\n";
-    // running the mask through the pixels in the vector to get the result   
     newImage = runMask(theBlurMask, {}, image, ans, WIDTH, HEIGHT); 
     cout << "Done the Blur filter!\n";
     return newImage;
@@ -200,17 +191,15 @@ vector <double> makeGaussMask(int ans) // this function is used to make a gaussi
     double coeff = 1/(2 * sigma * pi);
     int index = 0;
     // then for each value in the mask we'll calculate the G of it
-    for (int i = -ans; i <= ans; i++)
-    {
-        for (int j = -ans; j <= ans; j++)
-        {
+    for (int i = -ans; i <= ans; i++) {
+        for (int j = -ans; j <= ans; j++) {
             // calculating -(x^2 + y^2)/(2*σ^2)
             double power = -((i*i + j*j)/(2 * sigma));
             // then pluging everything together
             tempmask[index++] = coeff * exp(power);
         }
     }
-    // the reuslting values will be floating points, so we'll divide by the smallest value to get integer point values
+    // the reuslting values will be floating points, so we'll divide by the smallest value to get integer point values (not standard)
     double divBy = 1.0/min_element(tempmask.begin(), tempmask.end())[0];
     // the last mask that holds the integer point values
     vector <double> mask (k * k); 
@@ -226,16 +215,14 @@ vector <Pixel> sobelOperator(vector <Pixel> &image, int WIDTH, int HEIGHT) // th
     separator();
     // ask the user if they want to apply blur for smoothing the images before we apply the Sobel Operator
     if (inpurVer <int> (1, 2, "Do you want to use Blur before applying the edge detector?:\n1.Yes\n2.No\n") == 1) {
-        // apply a blur before we apply the Sobel Operator
         image = Blur(image, WIDTH, HEIGHT); }
 
-    // these are the Sobel Operator's masks, the Gx and Gy
-    vector <double> vertical = {
+    vector <double> verticalSobelMaskGx = {
         -1.0, 0.0, 1.0,
         -2.0, 0.0, 2.0,
         -1.0, 0.0, 1.0
     };
-    vector <double> horizontal = {
+    vector <double> horizontalSobelMaskGy = {
         -1.0, -2.0, -1.0,
          0.0,  0.0,  0.0,
          1.0,  2.0,  1.0
@@ -243,8 +230,7 @@ vector <Pixel> sobelOperator(vector <Pixel> &image, int WIDTH, int HEIGHT) // th
      
     separator();
     cout << "Making the Sobel filter...\n";
-    // run the masks on the vector that holds the pixels
-    vector <Pixel> newImage = runMask(vertical, horizontal, image, 1, WIDTH, HEIGHT);
+    vector <Pixel> newImage = runMask(verticalSobelMaskGx, horizontalSobelMaskGy, image, 1, WIDTH, HEIGHT);
     cout << "Done the Sobel filter!\n";
     return newImage;
 }
@@ -252,7 +238,6 @@ vector <Pixel> sobelOperator(vector <Pixel> &image, int WIDTH, int HEIGHT) // th
 
 vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny Edge detection
 {
-    // make a flat vector of length WIDTH by HEIGHT to store the new image
     vector <Pixel> newImage (WIDTH * HEIGHT);
     
     separator();
@@ -271,22 +256,18 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
     /*  =============================
         Non-Maximum Suppression (NMS):
         ============================= */
-    for (int i = 0; i < HEIGHT; i++)
-    {
+    for (int i = 0; i < HEIGHT; i++) {
         int row = i * WIDTH;
-        for (int j = 0; j < WIDTH; j++)
-        {
+        for (int j = 0; j < WIDTH; j++) {
             int idx = row + j;
-            // take the angle of the edge that is stored in the pixel, and do some math to know the edge
+            // take the angle of the edge that is stored in the pixel, add 22.5 and divide by 45 to get a value that represents the angle, we do %4 so angles >= 157.5 wrap around to 0
             int dir = int((image[idx].angle + 22.5) / 45.0) % 4;
-            // get the coordinates of pixels needed
             int x1 = j + dirX[dir][0];
             int x2 = j + dirX[dir][1];
             int y1 = i + dirY[dir][0];
             int y2 = i + dirY[dir][1];
             double pix1 = 0.0, pix2 = 0.0;
             
-            // check if these coordinates are in scope of image and assign their values to pix1 and pix2
             if (isInScopeOfImage(x1, y1, WIDTH, HEIGHT)) 
                 pix1 = image[y1 * WIDTH + x1].r;
             if (isInScopeOfImage(x2, y2, WIDTH, HEIGHT))
@@ -310,21 +291,16 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
     bool changes;
     do {
         changes = false;
-        for (int i = 0; i < HEIGHT; i++)
-        {
+        for (int i = 0; i < HEIGHT; i++) {
             int row = i * WIDTH;
-            for (int j = 0; j < WIDTH; j++)
-            {
+            for (int j = 0; j < WIDTH; j++) {
                 int idx = row + j;
                 /*  ================
                     Double Threshold:
                     ================ */
-                // check if the pixel is higher than the high threshold and leave it be
                 // (strong edge)
                 if (newImage[idx].r >= High) continue; 
-                else if (newImage[idx].r < Low)
-                {
-                    // else if it is lower than the low threshold delete it
+                else if (newImage[idx].r < Low) {
                     // (no edge)
                     setAllPixelsTo(newImage[idx], 0.0);
                     continue;
@@ -333,19 +309,15 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
                 /*  ========================
                     Hysteresis Edge Tracking:
                     ========================*/
-                for (int ni : {-1, 0, 1})
-                {
+                for (int ni : {-1, 0, 1}) {
                     bool connected = false;
-                    for (int nj : {-1, 0, 1})
-                    {
-                        if (ni == 0 && nj == 0) continue; // skip the pixek itselt
+                    for (int nj : {-1, 0, 1}) {
+                        if (ni == 0 && nj == 0) continue;
                         int x = j + nj;
                         int y = i + ni;
-                        if (isInScopeOfImage(x, y, WIDTH, HEIGHT))
-                        {
+                        if (isInScopeOfImage(x, y, WIDTH, HEIGHT)) {
                             // check if the weak edge pixel is connected to a strong edge, if so set it to the high threshold
-                            if (newImage[y * WIDTH + x].r >= High)
-                            {
+                            if (newImage[y * WIDTH + x].r >= High) {
                                 setAllPixelsTo(newImage[idx], High);
                                 connected = true;
                                 changes = true;
@@ -364,42 +336,33 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
 
 vector <Pixel> runMask(vector <double> mask, vector <double> SobelMask, vector <Pixel> image, int kernelSize, int WIDTH, int HEIGHT) // this function is for running a mask on an image flat vector
 {
-    // make a new flat vector to hold the pixels 
     vector <Pixel> newImage (WIDTH * HEIGHT);
     // check if the second mask for the Sobel Operator is empty (blur) or not (Sobel)
     // because this function is used by both the blur and the Sobel Operator
     bool sobel = !SobelMask.empty();
-    for (int i = 0; i < HEIGHT; i++)
-    {
+    for (int i = 0; i < HEIGHT; i++) {
         int row = i * WIDTH;
-        for (int j = 0; j < WIDTH; j++)
-        {
+        for (int j = 0; j < WIDTH; j++) {
             int idx = row + j;
-            // this is silly and can probably optimized in some way, idk
             double r, g, b, nc, Gx, Gy;
             r = g = b = nc = Gx = Gy = 0.0;
-            for (int ti = -kernelSize; ti <= kernelSize; ti++)
-            {
+            for (int ti = -kernelSize; ti <= kernelSize; ti++) {
                 int y = i + ti;
                 int maskRow = y * WIDTH;
-                for (int tj = -kernelSize; tj <= kernelSize; tj++)
-                {
+                for (int tj = -kernelSize; tj <= kernelSize; tj++) {
                     int x = j + tj;
-                    if (isInScopeOfImage(x, y, WIDTH, HEIGHT))
-                    {
+                    if (isInScopeOfImage(x, y, WIDTH, HEIGHT)) {
                         int kernelTurn = (ti + kernelSize) * (kernelSize * 2 + 1) + (tj + kernelSize);
                         int theImageInTheMaskIdx = maskRow + x;
                         // check the type of the mask
-                        if (sobel)
-                        {
-                            // if it is a sobel do the soble stuff
+                        if (sobel) {
+                            // Sobel
                             double gray = (image[theImageInTheMaskIdx].r + image[theImageInTheMaskIdx].g + image[theImageInTheMaskIdx].b)/3.0;
                             Gx +=  gray * mask[kernelTurn];
                             Gy +=  gray * SobelMask[kernelTurn];
                         }
-                        else
-                        {
-                            // else if it is a blur do a normal blur
+                        else {
+                            // Blur
                             double tr = mask[kernelTurn];
                             r  += image[theImageInTheMaskIdx].r * tr;
                             g  += image[theImageInTheMaskIdx].g * tr;
@@ -409,24 +372,22 @@ vector <Pixel> runMask(vector <double> mask, vector <double> SobelMask, vector <
                     }
                 }
             }
-            if (sobel)
-            {
-                // this one is clear tbh (or maybe I'm lazy to write comments, who knows)
+            if (sobel) {
+                // Sobel
                 double val = sqrt(Gx * Gx + Gy * Gy); 
                 // check if the pixel value is higher than 255 which is the maximum value
                 if (val > 255)
                     val = 255;
                 setAllPixelsTo(newImage[idx], val);
                 // calculate the angel of the edge for the canny edge detector
-                // this also should be done when requested only, but, meh
                 double angle = atan2(Gy, Gx) * transformFromRadToDeg; // notice that we turn the result to Degrees
                 // if the angle is negative, just add 180 so we get the responding positive value
                 if (angle < 0)
                     angle += 180.0;
                 newImage[idx].angle = angle;
             }
-            else
-            {
+            else {
+                // Blur
                 // get the weighted or normal mean for the blur types
                 newImage[idx].r = r/nc;
                 newImage[idx].g = g/nc;
@@ -479,13 +440,11 @@ vector <Pixel> loadImage(ifstream &f) // this function is used to read a bmp for
     
     vector <Pixel> image (width * height);
     int padding = (4 - ((width * 3) % 4)) % 4;
-    for (int i = 0; i < height; i++)
-    {
+    for (int i = 0; i < height; i++) {
         // we check if the height is flipped and reverse it back ourselves
         int y = (InvertedHeight) ? i : height - 1 - i;
         int row = y * width;
-        for (int j = 0; j < width; j++)
-        {
+        for (int j = 0; j < width; j++) {
             int idx = row + j;
 
             // the color table in bmp is bgr not rgb
@@ -532,11 +491,9 @@ void makeFile(vector <Pixel> &image, int WIDTH, int HEIGHT) // this function is 
     f.write((char*)& zero, 16);
 
     uint8_t pad[3] = {0,0,0};
-    for (int i = 0; i < HEIGHT; i++)
-    {
+    for (int i = 0; i < HEIGHT; i++) {
         int row = i * WIDTH;
-        for (int x = 0; x < WIDTH; x++)
-        {
+        for (int x = 0; x < WIDTH; x++) {
             int idx = row + x;
             f.put((uint8_t) image[idx].b);
             f.put((uint8_t) image[idx].g);
