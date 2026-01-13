@@ -1,12 +1,13 @@
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <cstdint>
-#include <limits>
 #include <algorithm>
-#include <ranges>
 #include <cmath>
+#include <cstdint>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <ranges>
+#include <string>
+#include <vector>
 
 using namespace std;
 
@@ -18,12 +19,13 @@ struct Pixel {
 int width, height;
 const double pi = 3.14159265358979323846264338327950288419716939937510;
 const double transformFromRadToDeg = 180.0 / pi;
+float totalTimeProcessing = 0.0;
 
 string getFileName();
 template <typename T>
 T inpurVer(T mini, T maxi, string message);
 void makeFile(const vector <Pixel> &image, int WIDTH, int HEIGHT);
-vector <double> makeGaussMask(int ans);
+vector <double> makeGaussMask(int ans); 
 vector <Pixel> loadImage(ifstream &f);
 vector <Pixel> Blur(const vector <Pixel> &image, int WIDTH, int HEIGHT);
 vector <Pixel> sobelOperator(vector <Pixel> &image, int WIDTH, int HEIGHT);
@@ -69,6 +71,7 @@ int main()
             break;
     }
     makeFile(image, width, height); 
+    cout << "It took: " << ::totalTimeProcessing/1000.0 << " in total\n";
     return 0;
 }
 
@@ -162,8 +165,11 @@ vector <Pixel> Blur(const vector <Pixel> &image, int WIDTH, int HEIGHT) // the b
 
     separator();
     cout << "Making the Blur filter...\n";
+    clock_t start = clock();
     newImage = runMask(theBlurMask, {}, image, ans, WIDTH, HEIGHT); 
-    cout << "Done the Blur filter!\n";
+    clock_t timeItTook = clock() - start;
+    ::totalTimeProcessing += timeItTook;
+    cout << "Done the Blur filter! It took: " << timeItTook/1000.0 << "s\n";
     return newImage;
 }
 
@@ -230,8 +236,11 @@ vector <Pixel> sobelOperator(vector <Pixel> &image, int WIDTH, int HEIGHT) // th
      
     separator();
     cout << "Making the Sobel filter...\n";
+    clock_t start = clock();
     vector <Pixel> newImage = runMask(verticalSobelMaskGx, horizontalSobelMaskGy, image, 1, WIDTH, HEIGHT);
-    cout << "Done the Sobel filter!\n";
+    clock_t timeItTook = clock() - start;
+    ::totalTimeProcessing += timeItTook;
+    cout << "Done the Sobel filter, it took: " << timeItTook/1000.0 << "s\n";
     return newImage;
 }
 
@@ -247,6 +256,7 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
     float The_Low_ThreshHold  = inpurVer <double> (0.0, The_High_ThreshHold, "Thresh hold 2 (Low): ");
     int Highest_Brightness = 0;
 
+    clock_t start = clock();
     separator();
     /* this is for pixels in the edge direction: -, /, |, \ */
     const int dirX[4][2] = {{-1,1},{1,-1},{0,0},{-1,1}};
@@ -330,9 +340,12 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
             }
         }
     } while (changes); // after doing the Hysteresis Edge Tracking recursively, many times perhaps, and there are not changes to be done, terminate the loop
-    cout << "Done making the canny Operator!";
+    clock_t timeItTook = clock() - start;
+    ::totalTimeProcessing += timeItTook;
+    cout << "Done making the canny Operator! It took: " << timeItTook/1000.0 << "s\n";
     return newImage;
 }
+
 
 vector <Pixel> runMask(const vector <double> &mask, const vector <double> &SobelMask, const vector <Pixel> &image, int kernelSize, int WIDTH, int HEIGHT) // this function is for running a mask on an image flat vector
 {
@@ -403,6 +416,7 @@ vector <Pixel> loadImage(ifstream &f) // this function is used to read a bmp for
 {
     separator();
     cout << "Loading the image...\n";
+    clock_t start = clock();
     int temph;
     /* The bmp file headers for clearer understanding
         ============
@@ -454,7 +468,9 @@ vector <Pixel> loadImage(ifstream &f) // this function is used to read a bmp for
         }
         f.ignore(padding);
     }
-    cout << "File was loaded successfully\n";
+    clock_t timeItTook = clock() - start;
+    ::totalTimeProcessing += timeItTook;
+    cout << "File was loaded successfully, it took: " << timeItTook/1000.0 << "s\n";
     f.close();
     return image;
 }
@@ -464,6 +480,7 @@ void makeFile(const vector <Pixel> &image, int WIDTH, int HEIGHT) // this functi
 {
     separator();
     cout << "Making the file...\n";
+    clock_t start = clock();
     int realh = abs(HEIGHT);
     int rowSize = WIDTH * 3;
     int padding = (4 - rowSize % 4) % 4;
@@ -502,5 +519,7 @@ void makeFile(const vector <Pixel> &image, int WIDTH, int HEIGHT) // this functi
         f.write((char*)pad, padding);
     }
     f.close();
-    cout << "Done making the file!\n";
+    clock_t timeItTook = clock() - start;
+    ::totalTimeProcessing += timeItTook;
+    cout << "Done making the file! It took: " << timeItTook/1000.0 << "s\n";
 }
