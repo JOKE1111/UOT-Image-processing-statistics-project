@@ -8,10 +8,12 @@
 #include <ranges>
 #include <string>
 #include <vector>
+#include <queue>
 
 using namespace std;
 
 struct Pixel {
+    int x, y;
     double r, g, b;
     int angle;
 };
@@ -256,12 +258,12 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
     float The_Low_ThreshHold  = inpurVer <double> (0.0, The_High_ThreshHold, "Thresh hold 2 (Low): ");
     int Highest_Brightness = 0;
 
-    clock_t start = clock();
     separator();
     /* this is for pixels in the edge direction: -, /, |, \ */
     const int dirX[4][2] = {{-1,1},{1,-1},{0,0},{-1,1}};
     const int dirY[4][2] = {{0,0},{1,-1},{-1,1},{1,-1}};
     cout << "Making the canny operator...\n";
+    clock_t start = clock();
     
     /*  =============================
         Non-Maximum Suppression (NMS):
@@ -294,54 +296,74 @@ vector <Pixel> canny(vector <Pixel> &image, int WIDTH, int HEIGHT) // the Canny 
         }
     }
     // the relative values of the higher and lower thresholds
+    clock_t NMSTime = clock() - start;
+    cout << "The NMS took: " << NMSTime/1000.0 << "s\n";
     int High = round(The_High_ThreshHold * Highest_Brightness);
-    int Low = round(The_Low_ThreshHold * Highest_Brightness);
+    int Low  = round(The_Low_ThreshHold  * Highest_Brightness);
     
+    queue <int> strongEdges = {};
+    /*  ================
+        Double Threshold:
+        ================ */
+    for (int i = 0; i < HEIGHT; i++)
+    {
+        int row = i * WIDTH;
+        for (int j = 0; j < WIDTH; j++)
+        {
+            int idx = row + j;
+            // (no edge)
+            if (newImage[idx].r >= High) {
+                newImage[idx].x = j;
+                newImage[idx].y = i;
+                strongEdges.push(idx);
+            }
+            else if (newImage[idx].r < Low) setAllPixelsTo(newImage[idx], 0.0);
+        }
+    }
+    clock_t DTTime = clock() - start - NMSTime;
+    cout << "The double threshold took: " << DTTime/1000.0 << "s\n";
 
-    bool changes;
-    do {
-        changes = false;
-        for (int i = 0; i < HEIGHT; i++) {
-            int row = i * WIDTH;
-            for (int j = 0; j < WIDTH; j++) {
-                int idx = row + j;
-                /*  ================
-                    Double Threshold:
-                    ================ */
-                // (strong edge)
-                if (newImage[idx].r >= High) continue; 
-                else if (newImage[idx].r < Low) {
-                    // (no edge)
-                    setAllPixelsTo(newImage[idx], 0.0);
-                    continue;
-                }
-                // (weak edge)
-                /*  ========================
-                    Hysteresis Edge Tracking:
-                    ========================*/
-                for (int ni : {-1, 0, 1}) {
-                    bool connected = false;
-                    for (int nj : {-1, 0, 1}) {
-                        if (ni == 0 && nj == 0) continue;
-                        int x = j + nj;
-                        int y = i + ni;
-                        if (isInScopeOfImage(x, y, WIDTH, HEIGHT)) {
-                            // check if the weak edge pixel is connected to a strong edge, if so set it to the high threshold
-                            if (newImage[y * WIDTH + x].r >= High) {
-                                setAllPixelsTo(newImage[idx], High);
-                                connected = true;
-                                changes = true;
-                                break;
-                            }
-                        }
+    /*  ========================
+        Hysteresis Edge Tracking:
+        ========================*/
+
+    while (!strongEdges.empty())
+    {
+        Pixel pix = newImage[strongEdges.front()];
+        for (int ni : {-1, 0, 1})
+        {
+            int y = pix.y + ni;
+            for (int nj : {-1, 0, 1})
+            {
+                if (ni == 0 && nj == 0) continue;
+                int x = pix.x + nj;
+                if (isInScopeOfImage(x, y, WIDTH, HEIGHT)) {
+                    int idx = y * WIDTH + x;
+                    if (newImage[idx].r > Low && newImage[idx].r < High) {
+                        strongEdges.push(idx);
+                        setAllPixelsTo(newImage[idx], High);
                     }
-                    if (connected) break;
                 }
             }
         }
-    } while (changes); // after doing the Hysteresis Edge Tracking recursively, many times perhaps, and there are not changes to be done, terminate the loop
+        strongEdges.pop();
+    }
+
+    clock_t HETTime = clock() - start - NMSTime - DTTime;
+    cout << "The Hysteresis Edge Tracking took: " << (HETTime)/1000.0 << "s\n";
+
+    for (int i = 0; i < HEIGHT; i++)
+    {
+        int row = i * WIDTH;
+        for (int j = 0; j < WIDTH; j++)
+        {
+            int idx = row + j;
+            if (newImage[idx].r < High) setAllPixelsTo(newImage[idx], 0.0);
+        }
+    }
     clock_t timeItTook = clock() - start;
     ::totalTimeProcessing += timeItTook;
+    cout << "Cleaning pixels took: " << (timeItTook - NMSTime - DTTime - HETTime)/1000.0 << "s\n";
     cout << "Done making the canny Operator! It took: " << timeItTook/1000.0 << "s\n";
     return newImage;
 }
